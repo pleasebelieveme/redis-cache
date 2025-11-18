@@ -16,10 +16,7 @@ public class ItemController {
     private final ItemService itemService;
 
     @PostMapping
-    public ItemDto create(
-            @RequestBody
-            ItemDto itemDto
-    ) {
+    public ItemDto create(@RequestBody ItemDto itemDto) {
         return itemService.create(itemDto);
     }
 
@@ -29,29 +26,23 @@ public class ItemController {
     }
 
     @GetMapping("{id}")
-    public ItemDto readOne(
-            @PathVariable("id")
-            Long id
-    ) {
+    public ItemDto readOne(@PathVariable("id") Long id) {
         return itemService.readOne(id);
     }
 
     @PutMapping("{id}")
-    public ItemDto update(
-            @PathVariable("id")
-            Long id,
-            @RequestBody
-            ItemDto dto
-    ) {
+    public ItemDto update(@PathVariable("id") Long id, @RequestBody ItemDto dto) {
         return itemService.update(id, dto);
     }
 
     @DeleteMapping("{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(
-            @PathVariable
-            Long id
-    ) {
+    public void delete(@PathVariable Long id) {
         itemService.delete(id);
     }
+
+	@GetMapping("/search")
+	public Page<ItemDto> search(@RequestParam(name = "q", required = true) String query, Pageable pageable) {
+		return itemService.searchByName(query, pageable);
+	}
 }

@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,8 @@ public class ItemService {
         this.itemRepository = itemRepository;
     }
 
+	// write-throw 전략
+	@CachePut(cacheNames = "itemCache", key = "#result.id")
     public ItemDto create(ItemDto dto) {
         return ItemDto.fromEntity(itemRepository.save(Item.builder()
                 .name(dto.getName())
@@ -31,20 +34,30 @@ public class ItemService {
                 .build()));
     }
 
-    public List<ItemDto> readAll() {
-        return itemRepository.findAll()
-                .stream()
-                .map(ItemDto::fromEntity)
-                .toList();
-    }
-
+	// 이 메서드의 결과는 캐싱이 가능하다
+	// cacheNames : 만들어지는 캐시를 지칭하는 이름
+	// key : 캐시 데이터를 구분하기 위해 활용하는 값
+	// cache-aside 전략
+	@Cacheable(cacheNames = "itemCache", key = "args[0]")
     public ItemDto readOne(Long id) {
+		log.info("Read One: {}", id);
         return itemRepository.findById(id)
                 .map(ItemDto::fromEntity)
                 .orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
+	@Cacheable(cacheNames = "itemAllCache", key = "getMethodName()")
+	public List<ItemDto> readAll() {
+		return itemRepository.findAll()
+			.stream()
+			.map(ItemDto::fromEntity)
+			.toList();
+	}
+
+	@CachePut(cacheNames = "itemCache", key = "args[0]")
+	// @CacheEvict(cacheNames = "itemAllCache", allEntries = true)
+	@CacheEvict(cacheNames = "itemAllCache", key = "'readAll'")
     public ItemDto update(Long id, ItemDto dto) {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -54,8 +67,19 @@ public class ItemService {
         return ItemDto.fromEntity(itemRepository.save(item));
     }
 
+	// @chcheEvict를 2개 동시에 사용 불가능하기에 아래주석처럼 구현하거나 @chching사용
+	// @CacheEvict(cacheNames = {"itemCache", "itemAllCache"}, key = "#id")
+	@Caching(evict = {
+		@CacheEvict(cacheNames = "itemCache", key = "#id"),
+		@CacheEvict(cacheNames = "itemAllCache", allEntries = true)
+	})
     public void delete(Long id) {
         itemRepository.deleteById(id);
     }
 
+	@Cacheable(cacheNames = "itemSearchCache", key = "{args[0], args[1].pageNumber, args[1].pageSize}")
+	public Page<ItemDto> searchByName(String query, Pageable pageable) {
+		return itemRepository.findAllByNameContains(query, pageable)
+			.map(ItemDto::fromEntity);
+	}
 }
